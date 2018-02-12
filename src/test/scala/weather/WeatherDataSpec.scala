@@ -33,8 +33,8 @@ class WeatherDataSpec extends TestBase with LazyLogging with Benchmark {
   import swaydb.order.KeyOrder.default
   import swaydb.serializers.Default._
 
-  val db = SwayDB.memory[Int, WeatherData]().assertSuccess
-  //    val db = SwayDB.persistent[Int, WeatherData](dir, acceleration = Accelerator.brake()).assertSuccess
+//  val db = SwayDB.memory[Int, WeatherData]().assertSuccess
+      val db = SwayDB.persistent[Int, WeatherData](dir, acceleration = Accelerator.brake()).assertSuccess
   //    val db = SwayDB.memoryPersistent[Int, WeatherData](testDir, maxOpenSegments = 10, cacheSize = 10.mb, maxMemoryLevelSize = 1.mb).assertSuccess
 
   val keyValueCount = 1000000

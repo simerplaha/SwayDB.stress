@@ -48,7 +48,7 @@ class SimulationSpec extends TestBase with CommonAssertions {
   import swaydb.serializers.Default.IntSerializer
 
   val db = SwayDB.memory[Int, Domain]().assertSuccess
-  //  val db = SwayDB.persistent[Int, Domain](dir, acceleration = Accelerator.brake()).assertSuccess
+  //    val db = SwayDB.persistent[Int, Domain](dir, acceleration = Accelerator.brake()).assertSuccess
   //  val db = SwayDB.persistent[Int, Domain](dir, mmapAppendix = false, mmapMaps = false, mmapSegments = MMAP.Disable).assertSuccess
 
   val ids = new AtomicInteger(0)
