@@ -27,8 +27,6 @@ import base.{CommonAssertions, TestBase}
 import simulation.Domain.{Product, User}
 import simulation.ProductCommand._
 import swaydb._
-import swaydb.data.accelerate.Accelerator
-import swaydb.data.config.MMAP
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
