@@ -21,6 +21,7 @@ package weather
 
 import base.TestBase
 import com.typesafe.scalalogging.LazyLogging
+import org.scalatest.{BeforeAndAfterAll, WordSpec}
 import swaydb.SwayDB
 import swaydb.core.util.Benchmark
 import swaydb.data.accelerate.Accelerator
@@ -28,18 +29,21 @@ import swaydb.data.accelerate.Accelerator
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class WeatherDataSpec extends TestBase with LazyLogging with Benchmark {
+import swaydb.order.KeyOrder.default
+import swaydb.serializers.Default._
 
-  import swaydb.order.KeyOrder.default
-  import swaydb.serializers.Default._
+class WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Benchmark with BeforeAndAfterAll {
 
-//  val db = SwayDB.memory[Int, WeatherData]().assertSuccess
-      val db = SwayDB.persistent[Int, WeatherData](dir, acceleration = Accelerator.brake()).assertSuccess
+  override protected def afterAll(): Unit =
+    walkDeleteFolder(dir)
+
+  implicit val ec = SwayDB.defaultExecutionContext
+
+  //  val db = SwayDB.memory[Int, WeatherData]().assertSuccess
+  val db = SwayDB.persistent[Int, WeatherData](dir, acceleration = Accelerator.brake()).assertSuccess
   //    val db = SwayDB.memoryPersistent[Int, WeatherData](testDir, maxOpenSegments = 10, cacheSize = 10.mb, maxMemoryLevelSize = 1.mb).assertSuccess
 
   val keyValueCount = 1000000
-
-  import scala.concurrent.ExecutionContext.Implicits.global
 
   def doPut =
     (1 to keyValueCount) foreach {

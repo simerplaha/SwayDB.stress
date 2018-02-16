@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.12.4"
 
-resolvers += Opts.resolver.sonatypeSnapshots
+resolvers += Opts.resolver.mavenLocalFile
 resolvers += Opts.resolver.sonatypeReleases
 
 libraryDependencies ++=

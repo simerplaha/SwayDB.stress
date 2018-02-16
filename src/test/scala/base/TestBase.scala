@@ -23,12 +23,12 @@ import java.io.IOException
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 
-import org.scalatest.{BeforeAndAfterAll, WordSpec}
+import org.scalatest.{AsyncWordSpec, BeforeAndAfterAll, WordSpec}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
-trait TestBase extends WordSpec with CommonAssertions with BeforeAndAfterAll {
+trait TestBase extends CommonAssertions {
 
   def deleteDB: Boolean = true
 
@@ -68,8 +68,5 @@ trait TestBase extends WordSpec with CommonAssertions with BeforeAndAfterAll {
           FileVisitResult.CONTINUE
         }
       })
-
-  override protected def afterAll(): Unit =
-    walkDeleteFolder(dir)
 
 }
