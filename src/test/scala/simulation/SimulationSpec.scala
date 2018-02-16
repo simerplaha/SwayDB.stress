@@ -192,13 +192,14 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
       case object StartTest extends TestCommand
       case class EndTest(after: FiniteDuration)(val replyTo: ActorRef[Assertion]) extends TestCommand
 
-      println
-      print("Select number of concurrent Users (hit Enter for 100): ")
+      //GET USER INPUT
+      print("\nSelect number of concurrent Users (hit Enter for 100): ")
       val maxUsers: Int = Try(readInt()) getOrElse 100
 
       print("How many minutes to run the test for (hit Enter for 10 minutes): ")
       val runFor = Try(readInt().minutes) getOrElse 10.minutes
 
+      //INITIALISE ACTOR SYSTEM
       val guardian =
         Actor.immutable[TestCommand] {
           case (ctx, command) =>
@@ -229,8 +230,9 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
       implicit val timeout = Timeout(runFor + 10.seconds)
 
+      //START TEST
       system ! StartTest
-      (system ? EndTest(runFor)) map {
+      (system ? EndTest(runFor)) map { //CREATE A FUTURE TO STOP TEST AFTER TEST TIMEOUT
         assertion =>
           logger.info(
             s"""
