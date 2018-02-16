@@ -52,7 +52,7 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
   import swaydb.serializers.Default.IntSerializer
 
-  //  lazy val db = SwayDB.memory[Int, Domain]().assertSuccess
+//    lazy val db = SwayDB.memory[Int, Domain]().assertSuccess
   lazy val db = SwayDB.persistent[Int, Domain](dir, acceleration = Accelerator.brake()).assertSuccess
   //  lazy val db = SwayDB.persistent[Int, Domain](dir, mmapAppendix = false, mmapMaps = false, mmapSegments = MMAP.Disable).assertSuccess
 
@@ -60,7 +60,7 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
   def genId = ids.incrementAndGet()
 
-  override def deleteDB: Boolean = false
+//  override def deleteDB: Boolean = false
 
   case class UserState(user: User,
                        products: mutable.Set[Product],
