@@ -71,8 +71,8 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
   //select any one of the following database to run test on.
   //  lazy val db = SwayDB.memory[Int, Domain]().assertSuccess
-//  lazy val db = SwayDB.persistent[Int, Domain](dir, acceleration = Accelerator.brake()).assertSuccess
-    lazy val db = SwayDB.persistent[Int, Domain](dir, mmapAppendix = false, mmapMaps = false, mmapSegments = MMAP.Disable).assertSuccess
+  lazy val db = SwayDB.persistent[Int, Domain](dir, acceleration = Accelerator.brake()).assertSuccess
+  //  lazy val db = SwayDB.persistent[Int, Domain](dir, mmapAppendix = false, mmapMaps = false, mmapSegments = MMAP.Disable).assertSuccess
 
   val ids = new AtomicInteger(0)
 
@@ -351,12 +351,12 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
       //Get test inputs
       print("\nSelect number of concurrent Users (hit Enter for 100): ")
-      //      val maxUsers: Int = Try(readInt()) getOrElse 100
-      val maxUsers: Int = 100
+      val maxUsers: Int = Try(readInt()) getOrElse 100
+      //      val maxUsers: Int = 100
 
       print("How many minutes to run the test for (hit Enter for 10 minutes): ")
-      //      val runFor = Try(readInt().minutes) getOrElse 10.minutes
-      val runFor = 5.minutes
+      val runFor = Try(readInt().minutes) getOrElse 10.minutes
+      //      val runFor = 5.minutes
 
       //Create actorSystem's root actor
       val guardian =
