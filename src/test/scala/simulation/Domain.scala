@@ -20,31 +20,27 @@
 package simulation
 
 import swaydb.data.slice.Slice
-import swaydb.data.util.ByteSizeOf
 import swaydb.serializers.Serializer
 
-sealed trait Domain {
-  val id: Int
-}
-
+sealed trait Domain
 object Domain {
-  case class User(id: Int) extends Domain
-  case class Product(id: Int, name: String) extends Domain
+  case class User(name: String) extends Domain
+  case class Product(name: String) extends Domain
 
   implicit object DomainSerializer extends Serializer[Domain] {
     override def write(data: Domain): Slice[Byte] =
       data match {
-        case User(id) =>
+        case User(name) =>
           Slice
-            .create(ByteSizeOf.int * 2)
+            .create(1000)
             .addInt(1)
-            .addInt(id)
+            .addString(name)
+            .close()
 
-        case Product(id, name) =>
+        case Product(name) =>
           Slice
             .create(100)
             .addInt(2)
-            .addInt(id)
             .addString(name)
             .close()
       }
@@ -54,12 +50,11 @@ object Domain {
       val dataId = reader.readInt()
       val result =
         if (dataId == 1) {
-          val userId = reader.readInt()
-          User(userId)
+          val userName = reader.readRemainingAsString()
+          User(userName)
         } else {
-          val productId = reader.readInt()
-          val productName = reader.readString()
-          Product(productId, productName)
+          val productName = reader.readRemainingAsString()
+          Product(productName)
         }
       result
     }

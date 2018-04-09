@@ -25,7 +25,7 @@ import org.scalatest.{BeforeAndAfterAll, WordSpec}
 import swaydb.SwayDB
 import swaydb.core.util.Benchmark
 import swaydb.data.accelerate.Accelerator
-
+import swaydb._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -39,9 +39,9 @@ class WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Bench
 
   implicit val ec = SwayDB.defaultExecutionContext
 
-  //  val db = SwayDB.memory[Int, WeatherData]().assertSuccess
+  //    val db = SwayDB.memory[Int, WeatherData]().assertSuccess
   val db = SwayDB.persistent[Int, WeatherData](dir, acceleration = Accelerator.brake()).assertSuccess
-  //    val db = SwayDB.memoryPersistent[Int, WeatherData](testDir, maxOpenSegments = 10, cacheSize = 10.mb, maxMemoryLevelSize = 1.mb).assertSuccess
+  //  val db = SwayDB.memoryPersistent[Int, WeatherData](dir, maxOpenSegments = 10, cacheSize = 10.mb, maxMemoryLevelSize = 500.mb).assertSuccess
 
   val keyValueCount = 1000000
 
@@ -150,7 +150,7 @@ class WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Bench
     val took =
       db
         .from(startFrom)
-        .until {
+        .till {
           case (key, _) =>
             key > startFrom - 100
         }
@@ -212,13 +212,16 @@ class WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Bench
   def doCount =
     db.size should be >= keyValueCount
 
-  def doDeleteAll =
-    (1 to keyValueCount) foreach {
+  def doDeleteAll = {
+    (1 to keyValueCount / 2) foreach {
       key =>
         if (key % 10000 == 0)
           println(s"Remove: Key = $key.")
         db.remove(key).assertSuccess
     }
+
+    db.remove(keyValueCount / 2, keyValueCount + 1).assertSuccess
+  }
 
   def putRequest = Future(doPut)
 

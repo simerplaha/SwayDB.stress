@@ -2,7 +2,7 @@
 
 Stress testing [SwayDB](https://github.com/simerplaha/SwayDB).
 
-http://swaydb.io/
+www.swaydb.io
 
 # SimulationSpec
 Multiple User [Actors](https://doc.akka.io/docs/akka/2.5.4/scala/typed.html) 
