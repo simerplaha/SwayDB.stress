@@ -33,7 +33,8 @@ trait CommonAssertions extends Matchers {
       getThis match {
         case Failure(exception) =>
           fail(exception)
-
+          System.exit(0)
+          throw exception
         case Success(value) =>
           value
       }
@@ -51,6 +52,8 @@ trait CommonAssertions extends Matchers {
       tryThis match {
         case Failure(exception) =>
           fail(exception)
+          System.exit(0)
+          throw exception
 
         case Success(value) =>
           value.assertGet
@@ -60,6 +63,8 @@ trait CommonAssertions extends Matchers {
       tryThis match {
         case Failure(exception) =>
           fail(exception)
+          System.exit(0)
+          throw exception
 
         case Success(value) =>
           value

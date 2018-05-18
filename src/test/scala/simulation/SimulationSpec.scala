@@ -21,6 +21,7 @@ package simulation
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.typed.scaladsl.AskPattern._
 import akka.typed.scaladsl._
 import akka.typed.{ActorRef, ActorSystem, Behavior}
 import akka.util.Timeout
@@ -37,10 +38,6 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.io.StdIn._
 import scala.util.{Random, Try}
-import akka.typed.scaladsl.AskPattern._
-import swaydb.data.config.MMAP
-
-import scala.concurrent.Future
 
 sealed trait RemoveAsserted
 object RemoveAsserted {
@@ -52,12 +49,16 @@ object RemoveAsserted {
 sealed trait ProductCommand
 object ProductCommand {
   case object Create extends ProductCommand
+  case object Put extends ProductCommand
   case object Update extends ProductCommand
-  case object BatchUpdate extends ProductCommand
-  case object RangeUpdate extends ProductCommand
+  case object Expire extends ProductCommand
+  case object ExpireRange extends ProductCommand
+  case object UpdateRange extends ProductCommand
+  case object DeleteRange extends ProductCommand
   case object Delete extends ProductCommand
+  case object BatchPut extends ProductCommand
   case object BatchDelete extends ProductCommand
-  case object RangeDelete extends ProductCommand
+  case object BatchExpire extends ProductCommand
   //assert's User's state and User's products state.
   case class AssertState(removeAsserted: RemoveAsserted) extends ProductCommand
 }
@@ -76,12 +77,10 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
   val ids = new AtomicInteger(0)
 
-  def genId = ids.incrementAndGet()
-
   case class UserState(userId: Int,
                        var nextProductId: Int,
                        user: User,
-                       products: mutable.Map[Int, Product],
+                       products: mutable.Map[Int, (Product, Option[Deadline])],
                        removedProducts: mutable.Set[Int],
                        var productsCreatedCountBeforeAssertion: Int)
 
@@ -108,14 +107,14 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                 //create 1 product
                 val (productId, product) = (genProductId, Product(randomCharacters()))
                 db.put(productId, product).assertSuccess
-                state.products.put(productId, product)
+                state.products.put(productId, (product, None))
 
                 //batch Create 2 products
                 val (batchProductId1, batchProduct1) = (genProductId, Product(randomCharacters()))
                 val (batchProductId2, batchProduct2) = (genProductId, Product(randomCharacters()))
                 db.batchPut(Seq((batchProductId1, batchProduct1), (batchProductId2, batchProduct2))).assertSuccess
-                state.products.put(batchProductId1, batchProduct1)
-                state.products.put(batchProductId2, batchProduct2)
+                state.products.put(batchProductId1, (batchProduct1, None))
+                state.products.put(batchProductId2, (batchProduct2, None))
 
                 //increment counter for the 3 created products
                 state.productsCreatedCountBeforeAssertion = state.productsCreatedCountBeforeAssertion + 3
@@ -125,12 +124,15 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                 if (state.productsCreatedCountBeforeAssertion >= maxProductsToCreateBeforeAssertion) {
                   logger.info(s"UserId: $userId - Created ${state.productsCreatedCountBeforeAssertion} products, state.products = ${state.products.size}, state.removedProducts = ${state.removedProducts.size} - ProductId: $productId")
                   self ! AssertState(removeAsserted = RemoveAsserted.RemoveNone)
-                  ctx.schedule((randomNextInt(3) + 1).second, self, Update)
-                  ctx.schedule((randomNextInt(3) + 1).second, self, BatchUpdate)
-                  ctx.schedule((randomNextInt(3) + 1).second, self, RangeUpdate)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, Put)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, BatchPut)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, UpdateRange)
                   ctx.schedule((randomNextInt(3) + 1).second, self, Delete)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, Expire)
                   ctx.schedule((randomNextInt(3) + 1).second, self, BatchDelete)
-                  ctx.schedule((randomNextInt(3) + 1).second, self, RangeDelete)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, BatchExpire)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, DeleteRange)
+                  ctx.schedule((randomNextInt(3) + 1).second, self, ExpireRange)
                   //if this User accumulates more then 5000 products in-memory, then assert and remove all
                   if (state.products.size + state.removedProducts.size >= 5000)
                     ctx.schedule(3.second, self, AssertState(removeAsserted = RemoveAsserted.RemoveAll))
@@ -153,6 +155,19 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
                 Actor.same
 
+              case Put if state.products.nonEmpty =>
+                //single
+                logger.info(s"UserId: $userId - Put")
+
+                val randomCreatedProducts = Random.shuffle(state.products)
+
+                //put a random existing single product
+                val (productId, (product, _)) = randomCreatedProducts.head
+                val putProduct = product.copy(name = product.name + "_" + randomCharacters() + "_put")
+                db.put(productId, putProduct).assertSuccess
+                state.products.put(productId, (putProduct, None))
+                Actor.same
+
               case Update if state.products.nonEmpty =>
                 //single
                 logger.info(s"UserId: $userId - Update")
@@ -160,14 +175,26 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                 val randomCreatedProducts = Random.shuffle(state.products)
 
                 //update a random single product
-                val (productId, product) = randomCreatedProducts.head
+                val (productId, (product, deadline)) = randomCreatedProducts.head
                 val updatedProduct = product.copy(name = product.name + "_" + randomCharacters() + "_updated")
-                db.put(productId, updatedProduct).assertSuccess
-                state.products remove productId
-                state.products.put(productId, updatedProduct)
+                db.update(productId, updatedProduct).assertSuccess
+                state.products.put(productId, (updatedProduct, deadline))
                 Actor.same
 
-              case BatchUpdate if state.products.nonEmpty =>
+              case Expire if state.products.nonEmpty =>
+                //single
+                logger.info(s"UserId: $userId - Expire")
+
+                val randomCreatedProducts = Random.shuffle(state.products)
+
+                //update a random single product
+                val (productId, (product, deadline)) = randomCreatedProducts.head
+                val newDeadline = deadline.map(_ - 1.second) getOrElse 1.hour.fromNow
+                db.expire(productId, newDeadline).assertSuccess
+                state.products.put(productId, (product, Some(newDeadline)))
+                Actor.same
+
+              case BatchPut if state.products.nonEmpty =>
                 //single
                 logger.info(s"UserId: $userId - BatchUpdate")
 
@@ -177,39 +204,60 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                 val batchProduct = randomCreatedProducts.takeRight(10)
                 val batchUpdatedProducts =
                   batchProduct map {
-                    case (productId, product) =>
-                      (productId, product.copy(name = product.name + "_" + randomCharacters() + "_batch_updated"))
+                    case (productId, (product, _)) =>
+                      (productId, product.copy(name = product.name + "_" + randomCharacters() + "_batch_put"))
                   }
                 db.batchPut(batchUpdatedProducts).assertSuccess
 
                 batchUpdatedProducts foreach {
                   case (id, product) =>
-                    state.products.put(id, product)
+                    state.products.put(id, (product, None))
                 }
                 Actor.same
 
-              case RangeUpdate if state.products.size >= 60 =>
-                logger.info(s"UserId: $userId - RangeUpdate")
+              case UpdateRange if state.products.size >= 60 =>
+                logger.info(s"UserId: $userId - UpdateRange")
 
                 val randomCreatedProducts = Random.shuffle(state.products)
 
-                val headProductId = randomCreatedProducts.head._1
+                val from = randomCreatedProducts.head._1 min randomCreatedProducts.last._1
+                val to = randomCreatedProducts.head._1 max randomCreatedProducts.last._1
 
-                val lastProductId = randomCreatedProducts.last._1
+                db.update(from, to, Product("range update")).assertSuccess
 
-                if (headProductId < lastProductId) {
-                  doUpdate(headProductId, lastProductId)
-                } else if (lastProductId < headProductId)
-                  doUpdate(lastProductId, headProductId)
+                (from to to) foreach {
+                  updatedProductId =>
+                    state.products.get(updatedProductId) map {
+                      case (_, deadline) =>
+                        state.products.put(updatedProductId, (Product("range update"), deadline))
+                    }
+                }
 
-                def doUpdate(from: Int, until: Int) = {
-                  db.update(from, until, Product("range update")).assertSuccess
+                Actor.same
 
-                  (from until until) foreach {
-                    updatedProductId =>
-                      if (state.products.contains(updatedProductId))
-                        state.products.put(updatedProductId, Product("range update"))
-                  }
+              case ExpireRange if state.products.size >= 60 =>
+                logger.info(s"UserId: $userId - ExpireRange")
+
+                val randomCreatedProducts = Random.shuffle(state.products)
+
+                val from = randomCreatedProducts.head._1 min randomCreatedProducts.last._1
+                val to = randomCreatedProducts.head._1 max randomCreatedProducts.last._1
+
+                val allDeadlines = state.products.filter(product => product._1 >= from && product._1 <= to).flatMap(_._2._2)
+                val newDeadline =
+                  if (allDeadlines.nonEmpty)
+                    allDeadlines.min - 1.second
+                  else
+                    1.hour.fromNow
+
+                db.expire(from, to, newDeadline).assertSuccess
+
+                (from to to) foreach {
+                  updatedProductId =>
+                    state.products.get(updatedProductId) map {
+                      case (product, _) =>
+                        state.products.put(updatedProductId, (product, Some(newDeadline)))
+                    }
                 }
 
                 Actor.same
@@ -243,30 +291,46 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                 }
                 Actor.same
 
-              case RangeDelete if state.products.size >= 60 =>
+              case BatchExpire if state.products.nonEmpty =>
+                logger.info(s"UserId: $userId - BatchExpire")
+
+                val randomCreatedProducts = Random.shuffle(state.products)
+
+                //batch expire random multiple 50 products
+                val batchProductsToExpire = randomCreatedProducts.takeRight(50)
+                val batchExpire = batchProductsToExpire.map(product => (product._1, product._2._2))
+                val allDeadlines = batchExpire.flatMap(_._2)
+                val newDeadline =
+                  if (allDeadlines.isEmpty)
+                    1.hour.fromNow
+                  else
+                    allDeadlines.min - 1.second
+
+                val expire = batchExpire.map(product => (product._1, newDeadline))
+
+                db.batchExpire(expire).assertSuccess
+                batchProductsToExpire foreach {
+                  case (productId, (product, _)) =>
+                    //                    logger.info(s"UserId: $userId - Batch remove product: $productId")
+                    state.products.put(productId, (product, Some(newDeadline)))
+                }
+                Actor.same
+
+              case DeleteRange if state.products.size >= 60 =>
                 logger.info(s"UserId: $userId - RangeDelete")
 
                 val randomCreatedProducts = Random.shuffle(state.products)
 
-                val headProductId = randomCreatedProducts.head._1
-                val lastProductId = randomCreatedProducts.last._1
+                val from = randomCreatedProducts.head._1 min randomCreatedProducts.last._1
+                val to = randomCreatedProducts.head._1 max randomCreatedProducts.last._1
 
-                if (headProductId < lastProductId) {
-                  doRemove(headProductId, lastProductId)
-                } else if (lastProductId < headProductId)
-                  doRemove(lastProductId, headProductId)
+                db.remove(from, to).assertSuccess
 
-                def doRemove(from: Int, until: Int) = {
-                  db.remove(from, until).assertSuccess
-
-                  (from until until) foreach {
-                    removedProductId =>
-                      state.products remove removedProductId
-                      state.removedProducts add removedProductId
-                  }
-
+                (from to to) foreach {
+                  removedProductId =>
+                    state.products remove removedProductId
+                    state.removedProducts add removedProductId
                 }
-
                 Actor.same
 
               case AssertState(removeAsserted) =>
@@ -278,10 +342,13 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                 //assert the state of created products in the User's state and remove products from state if required.
                 val removedProducts =
                   shuffledCreatedProducts.foldLeft(0) {
-                    case (removeCount, (productId, product)) =>
-                      Try(db.get(productId).assertSuccess should contain(product)) recoverWith {
+                    case (removeCount, (productId, (product, deadline))) =>
+                      Try {
+                        db.get(productId).assertSuccess should contain(product)
+                        db.expiration(productId).assertSuccess shouldBe deadline
+                      } recoverWith {
                         case ex =>
-                          System.err.println(s"*************************************************************** 111 At ID: $productId")
+                          System.err.println(s"*************************************************************** 111 At ID: $productId - deadline $deadline")
                           ex.printStackTrace()
                           System.exit(0)
                           throw ex
@@ -309,6 +376,7 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
                         case ex =>
                           System.err.println(s"*************************************************************** At ID: $productId")
                           ex.printStackTrace()
+                          println(db.get(productId))
                           System.exit(0)
                           throw ex
                       }
@@ -338,11 +406,6 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
   "Users" should {
 
-    //    "print DB" in {
-    //      db.foreach(println)
-    //      Future(true shouldBe true)
-    //    }
-
     "concurrently Create, Update, Read & Delete (CRUD) Products" in {
       //Commands for this test only.
       sealed trait TestCommand
@@ -356,7 +419,7 @@ class SimulationSpec extends AsyncWordSpec with TestBase with BeforeAndAfterAll 
 
       print("How many minutes to run the test for (hit Enter for 10 minutes): ")
       val runFor = Try(readInt().minutes) getOrElse 10.minutes
-      //      val runFor = 5.minutes
+      //      val runFor = 10.minutes
 
       //Create actorSystem's root actor
       val guardian =

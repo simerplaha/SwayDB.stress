@@ -19,8 +19,12 @@
 
 package simulation
 
+import java.util.concurrent.TimeUnit
+
 import swaydb.data.slice.Slice
 import swaydb.serializers.Serializer
+
+import scala.concurrent.duration.Deadline
 
 sealed trait Domain
 object Domain {
@@ -39,7 +43,7 @@ object Domain {
 
         case Product(name) =>
           Slice
-            .create(100)
+            .create(1000)
             .addInt(2)
             .addString(name)
             .close()
@@ -48,6 +52,7 @@ object Domain {
     override def read(data: Slice[Byte]): Domain = {
       val reader = data.createReader()
       val dataId = reader.readInt()
+
       val result =
         if (dataId == 1) {
           val userName = reader.readRemainingAsString()
