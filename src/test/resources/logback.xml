@@ -14,7 +14,7 @@
     <!--</appender>-->
 
     <appender name="TIME_BASED_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    	<file>swaydb-stress-test.log</file>
+        <file>swaydb-stress-test.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>swaydb-stress-test.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
             <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
@@ -27,6 +27,15 @@
             <pattern>%d{HH:mm:ss.SSS} %-5level %logger{0} - %msg%n</pattern>
         </encoder>
     </appender>
+
+
+    <logger name="swaydb.compression" additivity="false" level="debug">
+        <appender-ref ref="console"/>
+    </logger>
+
+    <logger name="swaydb.core.retry" additivity="false" level="debug">
+        <appender-ref ref="console"/>
+    </logger>
 
 
     <root level="info">

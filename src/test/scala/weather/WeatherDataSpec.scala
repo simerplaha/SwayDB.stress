@@ -26,22 +26,33 @@ import swaydb.SwayDB
 import swaydb.core.util.Benchmark
 import swaydb.data.accelerate.Accelerator
 import swaydb._
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
 import swaydb.order.KeyOrder.default
 import swaydb.serializers.Default._
+import swaydb.types.SwayDBMap
 
-class WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Benchmark with BeforeAndAfterAll {
+class Memory_WeatherDataSpec extends WeatherDataSpec {
+  override val db = SwayDB.memory[Int, WeatherData]().assertSuccess
+}
 
-  override protected def afterAll(): Unit =
-    walkDeleteFolder(dir)
+class Persistent_WeatherDataSpec extends WeatherDataSpec {
+  override val db = SwayDB.persistent[Int, WeatherData](dir, cacheSize = 10.mb, acceleration = Accelerator.brake()).assertSuccess
+}
+
+class MemoryPersistent_WeatherDataSpec extends WeatherDataSpec {
+  override val db = SwayDB.memoryPersistent[Int, WeatherData](dir, maxOpenSegments = 10, cacheSize = 10.mb, maxMemoryLevelSize = 500.mb).assertSuccess
+}
+
+sealed trait WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Benchmark with BeforeAndAfterAll {
+
+  //  override protected def afterAll(): Unit =
+  //    walkDeleteFolder(dir)
 
   implicit val ec = SwayDB.defaultExecutionContext
 
-  //    val db = SwayDB.memory[Int, WeatherData]().assertSuccess
-  val db = SwayDB.persistent[Int, WeatherData](dir, acceleration = Accelerator.brake()).assertSuccess
-  //  val db = SwayDB.memoryPersistent[Int, WeatherData](dir, maxOpenSegments = 10, cacheSize = 10.mb, maxMemoryLevelSize = 500.mb).assertSuccess
+  val db: SwayDBMap[Int, WeatherData]
 
   val keyValueCount = 1000000
 
@@ -247,12 +258,19 @@ class WeatherDataSpec extends WordSpec with TestBase with LazyLogging with Bench
 
   "concurrently write 1 million weather data entries using BookPickle and read using multiple APIs concurrently" in {
     //do initial put or batch (whichever one) to ensure that data exists for readRequests.
-    doPut
-    //    doBatch(inBatchesOf = 100000 min keyValueCount)
-    putRequest runThis 2.times
+    //    doPut
+    doBatch(inBatchesOf = 100000 min keyValueCount)
+    putRequest runThis 4.times
     batchRandomRequest runThis 2.times
     batchRequest(inBatchesOf = 10000 min keyValueCount)
-    readRequests runThis 2.times await 10.minutes
+    //    Future {
+    //      while (true) {
+    //        println("db.level0Meter.mapsCount:     " + db.level0Meter.mapsCount)
+    //        println("db.level1Meter.segmentsCount: " + db.level1Meter.segmentsCount)
+    //        sleep(5.seconds)
+    //      }
+    //    }
+    readRequests runThis 10.times await 10.minutes
     doDeleteAll
     println("************************* DONE *************************")
   }
