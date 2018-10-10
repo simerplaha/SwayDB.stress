@@ -26,6 +26,7 @@ import swaydb.SwayDB
 import swaydb.core.util.Benchmark
 import swaydb.data.accelerate.Accelerator
 import swaydb._
+import swaydb.configs.level.DefaultGroupingStrategy
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -35,6 +36,10 @@ import swaydb.types.SwayDBMap
 
 class Memory_WeatherDataSpec extends WeatherDataSpec {
   override val db = SwayDB.memory[Int, WeatherData]().assertSuccess
+}
+
+class Memory_WeatherDataGroupingStrategySpec extends WeatherDataSpec {
+  override val db = SwayDB.memory[Int, WeatherData](groupingStrategy = Some(DefaultGroupingStrategy())).assertSuccess
 }
 
 class Persistent_WeatherDataSpec extends WeatherDataSpec {

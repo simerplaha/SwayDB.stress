@@ -29,6 +29,7 @@ import simulation.Domain.{Product, User}
 import simulation.ProductCommand._
 import simulation.RemoveAsserted.{Remove, RemoveAll}
 import swaydb._
+import swaydb.configs.level.DefaultGroupingStrategy
 import swaydb.data.accelerate.Accelerator
 import swaydb.data.config.MMAP
 import swaydb.types.SwayDBMap
@@ -67,6 +68,13 @@ class Memory_SimulationSpec extends SimulationSpec {
   import swaydb.serializers.Default.LongSerializer
 
   override lazy val db = SwayDB.memory[Long, Domain]().assertSuccess
+}
+
+class Memory_SimulationGroupingStrategySpec extends SimulationSpec {
+
+  import swaydb.serializers.Default.LongSerializer
+
+  override lazy val db = SwayDB.memory[Long, Domain](groupingStrategy = Some(DefaultGroupingStrategy())).assertSuccess
 }
 
 class Persistent_SimulationSpec extends SimulationSpec {
