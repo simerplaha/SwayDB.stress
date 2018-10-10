@@ -29,15 +29,6 @@
     </appender>
 
 
-    <logger name="swaydb.compression" additivity="false" level="debug">
-        <appender-ref ref="console"/>
-    </logger>
-
-    <logger name="swaydb.core.retry" additivity="false" level="debug">
-        <appender-ref ref="console"/>
-    </logger>
-
-
     <root level="info">
         <appender-ref ref="console"/>
         <!--<appender-ref ref="TIME_BASED_FILE"/>-->
