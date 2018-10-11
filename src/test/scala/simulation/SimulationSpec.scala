@@ -120,16 +120,17 @@ sealed trait SimulationSpec extends WordSpec with TestBase with LazyLogging {
     command match {
       case Create =>
         //create 1 product
-        val (productId, product) = (genProductId, Product(randomCharacters()))
-        db.put(productId, product).assertSuccess
-        state.products.put(productId, (product, None))
+        val (productId1, product1) = (genProductId, Product(s"initialPut_${System.nanoTime()}"))
+        val (productId2, product2) = (genProductId, Product(s"initialPut_${System.nanoTime()}"))
+        val (productId3, product3) = (genProductId, Product(s"initialPut_${System.nanoTime()}"))
 
-        //batch Create 2 products
-        val (batchProductId1, batchProduct1) = (genProductId, Product(randomCharacters()))
-        val (batchProductId2, batchProduct2) = (genProductId, Product(randomCharacters()))
-        db.batchPut(Seq((batchProductId1, batchProduct1), (batchProductId2, batchProduct2))).assertSuccess
-        state.products.put(batchProductId1, (batchProduct1, None))
-        state.products.put(batchProductId2, (batchProduct2, None))
+        db.put(productId1, product1).assertSuccess
+        db.put(productId2, product2).assertSuccess
+        db.put(productId3, product3).assertSuccess
+
+        state.products.put(productId1, (product1, None))
+        state.products.put(productId2, (product2, None))
+        state.products.put(productId3, (product3, None))
 
         //increment counter for the 3 created products
         state.productsCreatedCountBeforeAssertion = state.productsCreatedCountBeforeAssertion + 3
@@ -137,7 +138,7 @@ sealed trait SimulationSpec extends WordSpec with TestBase with LazyLogging {
         val maxProductsToCreateBeforeAssertion = 1000
         //do updates and delete every 1000th product added and continue Creating more products
         if (state.productsCreatedCountBeforeAssertion >= maxProductsToCreateBeforeAssertion) {
-          logger.info(s"UserId: $userId - Created ${state.productsCreatedCountBeforeAssertion} products, state.products = ${state.products.size}, state.removedProducts = ${state.removedProducts.size} - ProductId: $productId")
+          logger.info(s"UserId: $userId - Created ${state.productsCreatedCountBeforeAssertion} products, state.products = ${state.products.size}, state.removedProducts = ${state.removedProducts.size} - ProductId: $productId1")
           self ! AssertState(removeAsserted = RemoveAsserted.RemoveNone)
           self.schedule(Put, (randomNextInt(2) + 1).seconds)
           self.schedule(BatchPut, (randomNextInt(2) + 1).seconds)
@@ -178,7 +179,7 @@ sealed trait SimulationSpec extends WordSpec with TestBase with LazyLogging {
 
           //put a random existing single product
           val (productId, (product, _)) = randomCreatedProducts.head
-          val putProduct = product.copy(name = product.name + "_" + randomCharacters() + "_put")
+          val putProduct = product.copy(name = product.name + "_" + s"put_${System.nanoTime()}")
           db.put(productId, putProduct).assertSuccess
           state.products.put(productId, (putProduct, None))
         }
@@ -192,7 +193,7 @@ sealed trait SimulationSpec extends WordSpec with TestBase with LazyLogging {
 
           //update a random single product
           val (productId, (product, deadline)) = randomCreatedProducts.head
-          val updatedProduct = product.copy(name = product.name + "_" + randomCharacters() + "_updated")
+          val updatedProduct = product.copy(name = product.name + "-" + s"updated_${System.nanoTime()}")
           db.update(productId, updatedProduct).assertSuccess
           state.products.put(productId, (updatedProduct, deadline))
         }
@@ -454,11 +455,11 @@ sealed trait SimulationSpec extends WordSpec with TestBase with LazyLogging {
   "Users" should {
 
     "print DB" in {
-      println(db.get(20000000000000095L).assertSuccess)
+      println(db.get(160000000000001887L).assertSuccess)
     }
 
     "concurrently Create, Update, Read & Delete (CRUD) Products" in {
-      val maxUsers: Int = 200
+      val maxUsers: Int = 100
       val runFor = 10.minutes
 
       (1 to maxUsers) map { //create Users in the database
